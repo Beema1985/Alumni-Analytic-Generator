@@ -22,7 +22,8 @@ from openpyxl.utils import get_column_letter
 SCHOOL_NAME = "Jain Vidyalaya"
 APP_TITLE = "Alumni Analytic Generator (AAG)"
 YEAR_MIN, YEAR_MAX = 2021, 2026
-FIELDS = ["Name", "Stream", "Course", "College", "Phone Number"]
+FIELDS = ["Name", "Course", "College", "Phone Number"]
+OPTIONAL_FIELDS = ["Class Of", "Status Text", "Occupation", "Organization", "City", "Country"]
 STATUS_DONE, STATUS_NOW = "Completed", "Currently Pursuing"
 
 st.set_page_config(page_title="AAG - " + SCHOOL_NAME, page_icon="🎓", layout="wide")
@@ -77,8 +78,6 @@ def _norm(s) -> str:
     return re.sub(r"[^a-z0-9]", "", str(s).lower())
 
 
-OPTIONAL_FIELDS = ["Class Of", "Status Text", "Occupation", "Organization"]
-
 # (field, header test) - tried in this order; each column is used once.
 COLUMN_RULES = [
     ("Phone Number", lambda n: any(k in n for k in ("phone", "mobile", "contact", "whatsapp"))),
@@ -86,9 +85,10 @@ COLUMN_RULES = [
     ("Occupation", lambda n: "occupation" in n or "highereducation" in n),
     ("Organization", lambda n: "organi" in n or "company" in n),
     ("Status Text", lambda n: n in ("status", "currentstatus")),
+    ("City", lambda n: "city" in n or "location" in n or "place" in n),
+    ("Country", lambda n: "country" in n or "abroad" in n),
     ("College", lambda n: n.startswith("college") or n in ("institution", "institute", "university")),
     ("Course", lambda n: n.startswith("course") or n.startswith("degree")),
-    ("Stream", lambda n: n.startswith("stream")),
     ("Name", lambda n: n.startswith("name") or n in ("studentname", "alumniname", "fullname")),
 ]
 
@@ -196,7 +196,6 @@ ENGINEER_RE = re.compile(
 DONE_RE = re.compile(r"complet|employed|job|graduat|passed|finished|alumnus|degree holder|working|placed")
 NOW_RE = re.compile(r"student|studying|pursu|ongoing|on going|studying|currently|\b[1-6](st|nd|rd|th) ?(year|yr|sem)|final year|appearing|internship")
 
-# typical programme length (years) used only when status is not written in the sheet
 DURATIONS = [
     (r"\bmd\b|\bms\b|\bdm\b|\bmch\b|\bmds\b|\bme\b|\bmtech\b|\bm tech\b", 3.0),
     (r"\bbds\b", 5.0),
@@ -209,10 +208,10 @@ def prep(text: str) -> str:
     return re.sub(r"[\-_/()&,:+]", " ", t)
 
 
-def classify_row(course: str, stream: str, college: str, batch_year, ref_year: int, status_text: str = ""):
+def classify_row(course: str, college: str, batch_year, ref_year: int, status_text: str = ""):
     c = prep(course)
     if not c.strip():
-        c = prep(stream)  # last resort when Course is blank
+        c = prep(college)  # last resort when Course is blank
     full = c + " " + prep(college)
 
     if ENGINEER_RE.search(c) and not re.search(r"\bmbbs\b|\bbds\b|\bbams\b|\bbhms\b", c):
@@ -226,8 +225,7 @@ def classify_row(course: str, stream: str, college: str, batch_year, ref_year: i
     else:
         return None, "", "", ""
 
-    # status -------------------------------------------------------------
-    raw_text = prep(course + " " + stream + " " + college)
+    raw_text = prep(course + " " + college)
     st_text = prep(status_text)
     if st_text and NOW_RE.search(st_text):
         status, basis = STATUS_NOW, "Stated"
@@ -249,7 +247,6 @@ def classify_row(course: str, stream: str, college: str, batch_year, ref_year: i
         else:
             status, basis = STATUS_NOW, "Unknown"
 
-    # branch / specialisation -------------------------------------------
     detail = ""
     if category == "Engineer":
         detail = "General / Not specified"
@@ -295,9 +292,9 @@ def build_dataset(workbook: bytes, ref_year: int):
         return int(m.group(1)) if m else sheet_year
 
     results = [
-        classify_row(c, s_, col, batch_of(co, y), ref_year, (st + " " + occ).strip())
-        for c, s_, col, co, y, st, occ in zip(
-            df["Course"], df["Stream"], df["College"], df["Class Of"], df["Year"],
+        classify_row(c, col, batch_of(co, y), ref_year, (st + " " + occ).strip())
+        for c, col, co, y, st, occ in zip(
+            df["Course"], df["College"], df["Class Of"], df["Year"],
             df["Status Text"], df["Occupation"])
     ]
     df["Category"] = [r[0] for r in results]
@@ -314,7 +311,7 @@ def build_dataset(workbook: bytes, ref_year: int):
 # 3. EXCEL EXPORT
 # --------------------------------------------------------------------------
 
-EXPORT_COLS = ["Name", "Stream", "Course", "College", "Phone Number", "Year", "Status", "Branch / Specialisation"]
+EXPORT_COLS = ["Name", "Course", "College", "City", "Phone Number", "Year", "Status", "Branch / Specialisation"]
 
 
 def to_excel(df: pd.DataFrame, title: str) -> bytes:
@@ -395,8 +392,9 @@ def apply_search(df: pd.DataFrame, q: str) -> pd.DataFrame:
     if not q:
         return df
     mask = pd.Series(False, index=df.index)
-    for col in ["Name", "Stream", "Course", "College", "Phone Number", "Branch / Specialisation"]:
-        mask |= df[col].str.contains(q, case=False, na=False, regex=False)
+    for col in ["Name", "Course", "College", "City", "Country", "Phone Number", "Branch / Specialisation"]:
+        if col in df.columns:
+            mask |= df[col].str.contains(q, case=False, na=False, regex=False)
     return df[mask]
 
 
@@ -448,8 +446,9 @@ with st.sidebar:
 
     with st.expander("School logo"):
         lg = st.file_uploader("Upload logo (or save logo.png beside app.py)", type=["png", "jpg", "jpeg", "webp"], key="logo_file")
-        if lg is not None:
+        if lg is not None and st.session_state.get("logo_bytes") != lg.getvalue():
             st.session_state["logo_bytes"] = lg.getvalue()
+            st.rerun()
 
 if analyse:
     try:
@@ -483,11 +482,20 @@ with st.sidebar:
     sel_years = st.multiselect("Year", years, default=years, key="f_years")
     colleges = sorted(data["College"].replace("", "Not specified").unique())
     sel_colleges = st.multiselect("College / Organisation", colleges, key="f_colleges")
-    search = st.text_input("Search (name, course, college, phone...)", key="f_search")
+    
+    abroad_option = st.selectbox("Location Type", ["All", "Domestic (India only)", "Abroad"], key="f_abroad_opt")
+    
+    search = st.text_input("Search (name, course, college, city, phone...)", key="f_search")
 
 base = data[data["Year"].isin(sel_years)].copy()
 if sel_colleges:
     base = base[base["College"].replace("", "Not specified").isin(sel_colleges)]
+
+if abroad_option == "Domestic (India only)":
+    base = base[~base["Country"].str.contains("abroad|us|uk|canada|australia|germany|dubai|uae|singapore", case=False, na=False)]
+elif abroad_option == "Abroad":
+    base = base[base["Country"].str.contains("abroad|us|uk|canada|australia|germany|dubai|uae|singapore", case=False, na=False)]
+
 base = apply_search(base, search.strip())
 
 cat = "Doctor" if profession == "Doctors" else "Engineer"
