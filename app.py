@@ -419,8 +419,38 @@ def apply_search(df: pd.DataFrame, q: str) -> pd.DataFrame:
 def show_grid(df: pd.DataFrame, label: str, key: str):
     view = df[EXPORT_COLS].reset_index(drop=True)
     view.insert(0, "Sr No", range(1, len(view) + 1))
-    st.caption(f"{len(view)} record(s)")
-    st.dataframe(view, use_container_width=True, hide_index=True, height=460)
+    
+    total_records = len(view)
+    st.caption(f"Total {total_records} record(s)")
+    
+    if total_records == 0:
+        st.dataframe(view, use_container_width=True, hide_index=True, height=200)
+    else:
+        # Pagination setup: 10 records per page
+        page_size = 10
+        total_pages = max(1, (total_records + page_size - 1) // page_size)
+        
+        c1, c2 = st.columns([2, 5])
+        with c1:
+            page_num = st.number_input(
+                f"Page (1-{total_pages})", 
+                min_value=1, 
+                max_value=total_pages, 
+                value=1, 
+                step=1, 
+                key=f"{key}_page"
+            )
+            
+        start_idx = (page_num - 1) * page_size
+        end_idx = min(start_idx + page_size, total_records)
+        
+        paginated_view = view.iloc[start_idx:end_idx]
+        
+        with c2:
+            st.markdown(f"<p style='padding-top:28px; margin:0;'>Showing records <b>{start_idx + 1}–{end_idx}</b> of <b>{total_records}</b></p>", unsafe_allow_html=True)
+            
+        st.dataframe(paginated_view, use_container_width=True, hide_index=True, height=400)
+        
     st.download_button(
         f"⬇ Download {label} (Excel)",
         data=to_excel(df, label),
