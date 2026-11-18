@@ -426,28 +426,41 @@ def show_grid(df: pd.DataFrame, label: str, key: str):
     if total_records == 0:
         st.dataframe(view, use_container_width=True, hide_index=True, height=200)
     else:
-        # Pagination setup: 10 records per page
         page_size = 10
         total_pages = max(1, (total_records + page_size - 1) // page_size)
         
-        c1, c2 = st.columns([2, 5])
-        with c1:
-            page_num = st.number_input(
-                f"Page (1-{total_pages})", 
-                min_value=1, 
-                max_value=total_pages, 
-                value=1, 
-                step=1, 
-                key=f"{key}_page"
+        # Initialize page state if not present
+        page_key = f"{key}_page_num"
+        if page_key not in st.session_state:
+            st.session_state[page_key] = 1
+            
+        # Ensure page state stays within valid range
+        if st.session_state[page_key] > total_pages:
+            st.session_state[page_key] = total_pages
+
+        # Layout for arrow pagination controls
+        col_prev, col_text, col_next = st.columns([1, 3, 1])
+        
+        with col_prev:
+            if st.button("◀ Prev", key=f"{key}_prev", disabled=(st.session_state[page_key] <= 1), use_container_width=True):
+                st.session_state[page_key] -= 1
+                st.rerun()
+                
+        with col_text:
+            st.markdown(
+                f"<p style='text-align: center; margin-top: 6px;'>Page <b>{st.session_state[page_key]}</b> of <b>{total_pages}</b> "
+                f"(Showing {(st.session_state[page_key] - 1) * page_size + 1}–{min(st.session_state[page_key] * page_size, total_records)})</p>", 
+                unsafe_allow_html=True
             )
             
-        start_idx = (page_num - 1) * page_size
+        with col_next:
+            if st.button("Next ▶", key=f"{key}_next", disabled=(st.session_state[page_key] >= total_pages), use_container_width=True):
+                st.session_state[page_key] += 1
+                st.rerun()
+            
+        start_idx = (st.session_state[page_key] - 1) * page_size
         end_idx = min(start_idx + page_size, total_records)
-        
         paginated_view = view.iloc[start_idx:end_idx]
-        
-        with c2:
-            st.markdown(f"<p style='padding-top:28px; margin:0;'>Showing records <b>{start_idx + 1}–{end_idx}</b> of <b>{total_records}</b></p>", unsafe_allow_html=True)
             
         st.dataframe(paginated_view, use_container_width=True, hide_index=True, height=400)
         
