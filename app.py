@@ -23,7 +23,7 @@ SCHOOL_NAME = "Jain Vidyalaya"
 APP_TITLE = "Alumni Analytic Generator (AAG)"
 YEAR_MIN, YEAR_MAX = 2021, 2026
 FIELDS = ["Name", "Course", "College", "Phone Number"]
-OPTIONAL_FIELDS = ["Class Of", "Status Text", "Occupation", "Organization", "City", "Country"]
+OPTIONAL_FIELDS = ["Class Of", "Status Text", "Occupation", "Organization", "City"]
 STATUS_DONE, STATUS_NOW = "Completed", "Currently Pursuing"
 
 st.set_page_config(page_title="AAG - " + SCHOOL_NAME, page_icon="🎓", layout="wide")
@@ -85,11 +85,10 @@ COLUMN_RULES = [
     ("Occupation", lambda n: "occupation" in n or "highereducation" in n),
     ("Organization", lambda n: "organi" in n or "company" in n),
     ("Status Text", lambda n: n in ("status", "currentstatus")),
-    ("City", lambda n: "city" in n or "location" in n or "place" in n),
-    ("Country", lambda n: "country" in n or "abroad" in n),
-    ("College", lambda n: n.startswith("college") or n in ("institution", "institute", "university")),
-    ("Course", lambda n: n.startswith("course") or n.startswith("degree")),
-    ("Name", lambda n: n.startswith("name") or n in ("studentname", "alumniname", "fullname")),
+    ("City", lambda n: "city" in n or "country" in n or "location" in n or "place" in n or "abroad" in n),
+    ("College", lambda n: "college" in n or "institution" in n or "institute" in n or "university" in n),
+    ("Course", lambda n: "course" in n or "degree" in n),
+    ("Name", lambda n: "name" in n or "studentname" in n or "alumniname" in n or "fullname" in n),
 ]
 
 
@@ -392,7 +391,7 @@ def apply_search(df: pd.DataFrame, q: str) -> pd.DataFrame:
     if not q:
         return df
     mask = pd.Series(False, index=df.index)
-    for col in ["Name", "Course", "College", "City", "Country", "Phone Number", "Branch / Specialisation"]:
+    for col in ["Name", "Course", "College", "City", "Phone Number", "Branch / Specialisation"]:
         if col in df.columns:
             mask |= df[col].str.contains(q, case=False, na=False, regex=False)
     return df[mask]
@@ -491,10 +490,11 @@ base = data[data["Year"].isin(sel_years)].copy()
 if sel_colleges:
     base = base[base["College"].replace("", "Not specified").isin(sel_colleges)]
 
+# Filter logic for Abroad vs Domestic (checking the City column)
 if abroad_option == "Domestic (India only)":
-    base = base[~base["Country"].str.contains("abroad|us|uk|canada|australia|germany|dubai|uae|singapore", case=False, na=False)]
+    base = base[~base["City"].str.contains("abroad|us|uk|usa|canada|australia|germany|dubai|uae|singapore|new zealand|ukraine|russia|georgia", case=False, na=False)]
 elif abroad_option == "Abroad":
-    base = base[base["Country"].str.contains("abroad|us|uk|canada|australia|germany|dubai|uae|singapore", case=False, na=False)]
+    base = base[base["City"].str.contains("abroad|us|uk|usa|canada|australia|germany|dubai|uae|singapore|new zealand|ukraine|russia|georgia", case=False, na=False)]
 
 base = apply_search(base, search.strip())
 
