@@ -438,6 +438,30 @@ def show_grid(df: pd.DataFrame, label: str, key: str):
         if st.session_state[page_key] > total_pages:
             st.session_state[page_key] = total_pages
 
+        # Custom CSS to style the pagination buttons with your theme color
+        st.markdown(
+            """
+            <style>
+            div.stButton > button {
+                background-color: #7B1E1E !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 6px !important;
+                font-weight: 600 !important;
+            }
+            div.stButton > button:hover {
+                background-color: #B5452F !important;
+                color: white !important;
+            }
+            div.stButton > button:disabled {
+                background-color: #e0e0e0 !important;
+                color: #9e9e9e !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
         # Layout for arrow pagination controls
         col_prev, col_text, col_next = st.columns([1, 3, 1])
         
