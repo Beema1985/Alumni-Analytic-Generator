@@ -27,7 +27,8 @@ OPTIONAL_FIELDS = ["Class Of", "Status Text", "Occupation", "Organization", "Cit
 STATUS_DONE, STATUS_NOW = "Completed", "Currently Pursuing"
 
 # Configured with your GitHub username and exact logo file name (spaces encoded as %20)
-GITHUB_LOGO_URL = "https://raw.githubusercontent.com/Beema1985/YOUR_REPO_NAME/main/JAIN%20VIDYALAYA%20LOGO.png"
+#GITHUB_LOGO_URL = "https://raw.githubusercontent.com/Beema1985/YOUR_REPO_NAME/main/JAIN%20VIDYALAYA%20LOGO.png"
+GITHUB_LOGO_URL = "https://raw.githubusercontent.com/Beema1985/Alumni-Analytic-Generator/main/JAIN%20VIDYALAYA%20LOGO.png"
 
 st.set_page_config(page_title="AAG - " + SCHOOL_NAME, page_icon="🎓", layout="wide")
 
