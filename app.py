@@ -26,6 +26,9 @@ FIELDS = ["Name", "Course", "College", "Phone Number"]
 OPTIONAL_FIELDS = ["Class Of", "Status Text", "Occupation", "Organization", "City"]
 STATUS_DONE, STATUS_NOW = "Completed", "Currently Pursuing"
 
+# Configured with your GitHub username and exact logo file name (spaces encoded as %20)
+GITHUB_LOGO_URL = "https://raw.githubusercontent.com/Beema1985/YOUR_REPO_NAME/main/JAIN%20VIDYALAYA%20LOGO.png"
+
 st.set_page_config(page_title="AAG - " + SCHOOL_NAME, page_icon="🎓", layout="wide")
 
 # --------------------------------------------------------------------------
@@ -338,7 +341,7 @@ def to_excel(df: pd.DataFrame, title: str) -> bytes:
 
 
 # --------------------------------------------------------------------------
-# 4. UI HELPERS
+# 4. UI HELPERS & GITHUB LOGO LOADER
 # --------------------------------------------------------------------------
 
 st.markdown(
@@ -357,22 +360,37 @@ st.markdown(
 )
 
 
+@st.cache_data(show_spinner=False, ttl=86400)
+def fetch_github_logo() -> bytes:
+    """Automatically fetch the school logo from the GitHub repository raw URL."""
+    try:
+        r = requests.get(GITHUB_LOGO_URL, timeout=5)
+        if r.status_code == 200 and len(r.content) > 500:
+            return r.content
+    except Exception:
+        pass
+    return None
+
+
 def find_logo():
+    # 1. Check session upload
     uploaded = st.session_state.get("logo_bytes")
     if uploaded:
         return uploaded
-    for name in ("logo.png", "logo.jpg", "logo.jpeg", "logo.webp"):
+    # 2. Check local folder
+    for name in ("JAIN VIDYALAYA LOGO.png", "logo.png", "logo.jpg"):
         p = Path(__file__).parent / name
         if p.exists():
             return p.read_bytes()
-    return None
+    # 3. Automatically fetch from GitHub
+    return fetch_github_logo()
 
 
 def header():
     logo = find_logo()
     if logo:
         b64 = base64.b64encode(logo).decode()
-        logo_html = f'<img src="data:image/png;base64,{b64}" style="height:64px;border-radius:8px;background:#fff;padding:3px;">'
+        logo_html = f'<img src="data:image/png;base64,{b64}" style="height:64px;border-radius:8px;background:#fff;padding:3px;object-fit:contain;">'
     else:
         logo_html = '<div class="aag-logo-ph">JV</div>'
     st.markdown(
@@ -444,7 +462,7 @@ with st.sidebar:
     c2.button("Reset", on_click=reset_all, use_container_width=True)
 
     with st.expander("School logo"):
-        lg = st.file_uploader("Upload logo (or save logo.png beside app.py)", type=["png", "jpg", "jpeg", "webp"], key="logo_file")
+        lg = st.file_uploader("Upload logo", type=["png", "jpg", "jpeg", "webp"], key="logo_file")
         if lg is not None and st.session_state.get("logo_bytes") != lg.getvalue():
             st.session_state["logo_bytes"] = lg.getvalue()
             st.rerun()
